@@ -1,45 +1,43 @@
-// file sqlite_db.cpp
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <vector>
+#include "sqlite_db.h"
 
 #include "sqlite3.h"
-#include "sqlite_db.h"
+
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <vector>
+
 #include "utilities.h"
 
-int SQLite_DB::m_id = 0;
+int SQLite_DB::s_record_id = 0;
 
 SQLite_DB::SQLite_DB(const std::string& n)
   : m_db_ptr(nullptr)
   , m_name(n)
-  , m_file_name(n)
+  , m_table_name("Contacts")
 {}
 
-bool SQLite_DB::create_sql_database()
+bool SQLite_DB::create_database()
 {
-  if (sqlite3_open(m_file_name.c_str(), &m_db_ptr) != SQLITE_OK) {
+  if (sqlite3_open(m_name.c_str(), &m_db_ptr) != SQLITE_OK) {
     report_sqlite_error(__FILE__, __LINE__);
     return false;
   }
-  //std::cout << "\t === Created database... name- " << m_name << std::endl;
   return true;
 }
 
-
-bool SQLite_DB::generate_data(int r)
+bool SQLite_DB::generate_data(int row_count)
 {
-  std::cout << "- Creating table and inserting __ " << r << " __ rows with random data to it...\n"
+  std::cout << "- Creating table and inserting __ " << row_count << " __ rows with random data to it...\n"
             << "\t\tPlease wait for a while...\n";
 
-  std::string table_name = "Contacts";
-  if (!create_table(table_name)) {
-    std::cerr << "!!!!!!! Failed to create table...\n";
+  if (!create_table()) {
+    std::cerr << "ERROR: Failed to create a table...\n";
     sqlite3_close(m_db_ptr);
     return false;
   } 
 
-  if (!fillup_table(table_name, r)) {
+  if (!fillup_table(row_count)) {
     return false;
   }
   std::cerr << "\n- Finished adding data...\n\n";
@@ -48,19 +46,16 @@ bool SQLite_DB::generate_data(int r)
   return true;
 }
 
-bool SQLite_DB::create_table(const std::string& table_name)
+bool SQLite_DB::create_table() const
 {
-  /* Create SQL statement */
   const std::string sqlstatement =
-    "CREATE TABLE IF NOT EXISTS " /* + m_name + "."*/ + table_name + " ("
+    "CREATE TABLE IF NOT EXISTS " + m_table_name + " ("
             "ID      INT   PRIMARY KEY,"
             "NAME    TEXT  NOT NULL,"
             "COUNTRY TEXT  NOT NULL,"
             "EMAIL   TEXT  NOT NULL UNIQUE);";
-  //std::cout << "\t\tsqlstatement:\n" << sqlstatement << std::endl;
 
   int rc = sqlite3_exec(m_db_ptr, sqlstatement.c_str(), 0, 0, 0);
-  //std::cout << "\trc = " << rc << std::endl;
   if (rc != SQLITE_OK) {
     report_sqlite_error(__FILE__, __LINE__);
     return false;
@@ -68,19 +63,19 @@ bool SQLite_DB::create_table(const std::string& table_name)
   return true;
 }
 
-bool SQLite_DB::fillup_table(const std::string& table_name, int r)
+bool SQLite_DB::fillup_table(int row_count)
 {
-  int rc = sqlite3_open(m_file_name.c_str(), &m_db_ptr);
+  int rc = sqlite3_open(m_name.c_str(), &m_db_ptr);
   if (rc != SQLITE_OK) {
-    std::cerr << "!!!!! Failed to open db\n";
+    std::cerr << "ERROR: Failed to open the database\n";
     report_sqlite_error(__FILE__, __LINE__);
     return false;
   }
   std::cout << "- Filling up...";
 
-  for (int i = 0; i < r; ++i) {
-    db_record rec = generate_record();
-    if (!add_record(rec, table_name)) {
+  for (int i = 0; i < row_count; ++i) {
+    Record rec = generate_record();
+    if (!add_record(rec)) {
       return false;
     }
     std::cout << ".";
@@ -96,17 +91,13 @@ bool SQLite_DB::fillup_table(const std::string& table_name, int r)
 
 bool SQLite_DB::dump_to_file(const std::string& file_path)
 {
-  //std::cout << "- Dumping database to a file ... \n\n";
-
-  //FILE* fout = fopen(file_path.c_str(), "w");
   std::ofstream fout(file_path);
   if (!fout.is_open()) {
-    /* Error handling with errno and exit */
-    std::cerr << "Error: Failed open file..."  << std::endl;
+    std::cerr << "Error: Failed open the file..."  << std::endl;
     return false;
   }
 
-  if (sqlite3_open(m_file_name.c_str(), &m_db_ptr) != SQLITE_OK) {
+  if (sqlite3_open(m_name.c_str(), &m_db_ptr) != SQLITE_OK) {
     report_sqlite_error(__FILE__, __LINE__);
     return false;
   }
@@ -137,7 +128,6 @@ bool SQLite_DB::dump_to_file(const std::string& file_path)
   }
 
   sqlite3_finalize(select_stmt);
-  //disconnect();
 
   fout.close();
 
@@ -145,26 +135,26 @@ bool SQLite_DB::dump_to_file(const std::string& file_path)
   return true;
 }
 
-db_record SQLite_DB::generate_record()
+SQLite_DB::Record SQLite_DB::generate_record() const
 {
   srand((unsigned int)time(nullptr));
 
-  db_record rec;
-  rec.name = generate_random_string(6 + rand() % 5);     // lenght from 6 - 10 chars ;
-  rec.country = generate_random_string(5 + rand() % 16); // [5 - 20] ;
+  Record rec;
+  rec.name = generate_random_string(6 + rand() % 5, false);     // lenght from 6 - 10 chars ;
+  rec.country = generate_random_string(5 + rand() % 16, false); // [5 - 20] ;
   rec.email = generate_unique_email();  
   
   return rec;
 }
 
-bool SQLite_DB::add_record(const db_record& rec, const std::string& table_name)
+bool SQLite_DB::add_record(const Record& rec) const
 {
   sqlite3_stmt* insert_stmt = nullptr;
-  std::string id = std::to_string(++m_id);
-  const std::string sql_statement = "INSERT INTO " + table_name +
+  std::string id = std::to_string(++s_record_id);
+  const std::string sql_statement = "INSERT INTO " + m_table_name +
     " VALUES (" + id + ", \"" + rec.name + "\", \"" + rec.country + "\", \"" + rec.email + "\");";
 
-  int rc = sqlite3_prepare_v2(m_db_ptr, sql_statement.c_str(), sql_statement.size(), &insert_stmt, 0);//preparing the statement
+  int rc = sqlite3_prepare_v2(m_db_ptr, sql_statement.c_str(), sql_statement.size(), &insert_stmt, 0); // preparing the statement
   if (rc != SQLITE_OK) {
     report_sqlite_error(__FILE__, __LINE__);
     sqlite3_finalize(insert_stmt);
@@ -180,14 +170,13 @@ bool SQLite_DB::add_record(const db_record& rec, const std::string& table_name)
 
   sqlite3_reset(insert_stmt);
   sqlite3_finalize(insert_stmt);
+
   return true;
 }
 
-void SQLite_DB::disconnect()
+void SQLite_DB::disconnect() const
 {
-  std::cout << "- Disconnecting SQLite db...\n\n";
   sqlite3_close(m_db_ptr);
-  //return sqlite3_close(m_db_ptr) == SQLITE_OK;
 }
 
 void SQLite_DB::report_sqlite_error(const std::string& file, int line) const

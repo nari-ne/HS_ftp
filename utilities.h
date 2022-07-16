@@ -1,23 +1,15 @@
-#ifndef UTILITIES_H
-#define UTILITIES_H
+#pragma once
 
-#include <string>
 #include <set>
+#include <string>
 
-// Enables/ disables echo input
-void show_input(bool enable = true);
-
-// Gets parameters for the ftp server
+// Reads parameters for the ftp server from the input stream
 void input_parameters_for_ftp_server(std::string& host, int port, std::string& user_name, std::string& password);
 
-// Gets directory path on the ftp server, where the export file should be copied
-void input_ftp_directory_path(std::string& path);
+// Generates a random string using an array of characters [A-Za-z0-9]
+std::string generate_random_string(int length, bool include_digits = true);
 
-// Generate a random string using an array of characters [A-Za-z0-9]
-std::string generate_random_string(int length, bool digits_included = false);
-
-// Generate a random string for email address, which is unique in existing emails list
+// Generates a random string for email address, which is unique in existing email list
 std::string generate_unique_email();
 
-#endif //UTILITIES_H
-
+bool file_exists(const std::string& file_name);

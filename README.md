@@ -1,17 +1,88 @@
-# HS_ftp
-SQL Backup to FTP server
+# HS_ftpi
+SQL Database Backup to FTP server
 
-Created a Windows console application, that is designed for generating data for a SQLLite database, exporting database data into a file and send the file to a FTP server.
+This is a simple project in C++ intended for generating data for a SQLite database, exporting database data into a file and send the file to a FTP server.
 
-The input parameters for the application should be
-- SQLite database file name
-- host, port, username and password for the ftp server
-- directory path on the ftp server, where the export file should be copied
+Compilation has been tested with Microsoft Visual Studio 2017 (Windows 10)
 
-The console application
+Application
 - creates a SQLLite database and a table
 - inserts 100 rows with random data to it
 - dumps the database to a file provided by user
 - transfers the dump file to the ftp server’s given folder
 
-Follow the runtime instructions of the executable.
+Input parameters for the application:
+- SQLite database file name
+- host, port, username and password for the ftp server
+- directory path on the ftp server, where the export file should be copied.
+
+Database table name:
+- Contacts
+
+Database table structure:
+colomn name    | constraint 
+-------------------------
+- ID           | int
+- NAME	       | TEXT
+- COUNTRY      | TEXT
+- EMAIL        | TEXT UNIQE
+
+
+Note.
+- SQLite database file to be created should not be existed
+- If one of server specific parameters is incorrect, project is stoped.
+- If a directory by given path does not exist on FTP server, a new directory is created.
+- After each error a special error message with error code is appeared to help to get the exact place and location of an error 
+- At the end of each module final status is appeared on console.
+
+After lounch the application please follow the runtime instructions of the executable.
+
+----------------------------------------------------
+Application log example:
+
+Creating SQLite Database and Transferring Data to FTP server...
+
+
+Database (file) name: DB01
+=== Create Database: PASSED
+
+- Creating table and inserting __ 100 __ rows with random data to it...
+                Please wait for a while...
+- Filling up.......................................................................................................
+- Finished adding data...
+
+=== Generate data and fill up table: PASSED
+
+File name to dump database to: dmp_DB01.db
+
+=== Dump to file: PASSED
+
+- Disconnecting SQLite db...
+
+- Sign in to FTP server...
+Host: 127.0.0.1
+Port: 21
+Username: narinem
+Password:
+
+- Establishing an FTP Connection...
+
+=== Initialize use of the WinINet functions: PASSED
+
+=== Open an FTP session for site 127.0.0.1: PASSED
+
+
+Directory path on the ftp server: BCKP
+- user defined folder does not exist, creating ...
+
+- set user defined BCKP folder as current directory
+
+- uploading dmp_DB01.db local file to BCKP remote folder on FTP server
+> ftpput dmp_DB01.db BCKP/dmp_DB01.db
+
+=== FtpPutFile: PASSED
+
+=== Close FTP session: PASSED
+
+=== Close the WinINet functions use: PASSED
+
