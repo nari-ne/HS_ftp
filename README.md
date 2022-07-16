@@ -21,7 +21,7 @@ Database table name:
 
 Database table structure:
 colomn name    | constraint 
--------------------------
+----------------------------
 - ID           | int
 - NAME	       | TEXT
 - COUNTRY      | TEXT
@@ -35,15 +35,16 @@ Note.
 - After each error a special error message with error code is appeared to help to get the exact place and location of an error 
 - At the end of each module final status is appeared on console.
 
-After lounch the application please follow the runtime instructions of the executable.
+After launch the application please follow the runtime instructions of the executable.
 
-----------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------
 Application log example:
+
 
 Creating SQLite Database and Transferring Data to FTP server...
 
 
-Database (file) name: DB01
+Database (file) name: demo.db
 === Create Database: PASSED
 
 - Creating table and inserting __ 100 __ rows with random data to it...
@@ -53,11 +54,9 @@ Database (file) name: DB01
 
 === Generate data and fill up table: PASSED
 
-File name to dump database to: dmp_DB01.db
+File name to dump database to: demo.dump
 
 === Dump to file: PASSED
-
-- Disconnecting SQLite db...
 
 - Sign in to FTP server...
 Host: 127.0.0.1
@@ -72,17 +71,19 @@ Password:
 === Open an FTP session for site 127.0.0.1: PASSED
 
 
-Directory path on the ftp server: BCKP
+Directory path on the ftp server: backup
 - user defined folder does not exist, creating ...
 
-- set user defined BCKP folder as current directory
+- set user defined backup folder as current directory
 
-- uploading dmp_DB01.db local file to BCKP remote folder on FTP server
-> ftpput dmp_DB01.db BCKP/dmp_DB01.db
+- uploading demo.dump local file to backup remote folder on server
+> ftpput demo.dump backup/demo.dump
 
 === FtpPutFile: PASSED
+
+
+Finished transferring Data to the FTP server
 
 === Close FTP session: PASSED
 
 === Close the WinINet functions use: PASSED
-
