@@ -1,0 +1,13 @@
+Debug/
+HS_db_backup.vcxproj
+HS_db_backup.vcxproj.filters
+HS_db_backup.vcxproj.user
+pch.cpp
+pch.h
+sqlite3.c
+sqlite3.def
+sqlite3.dll
+sqlite3.exp
+sqlite3.h
+sqlite3.lib
+sqlite3ext.h
