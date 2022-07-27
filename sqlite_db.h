@@ -18,17 +18,20 @@ public:
 
 public:
   SQLite_DB(const std::string& name);
+  ~SQLite_DB();
 
   bool create_database();                          // Create a new SQLite database connection
   bool generate_data(int row_count);               // Create table and insert row_count rows with random data to it
   bool dump_to_file(const std::string& filename);  // Dump database to a file
-  void disconnect() const;                         // Close database
+  
+  void drop_table() const;                         // Added for Unit test purposes
 
 private:
   bool create_table() const;
   bool fillup_table(int row_count);
   Record generate_record() const;
   bool add_record(const Record& rec) const;
+  void disconnect() const;                         // Close database
 
   void report_sqlite_error(const std::string& file, int line) const; // Helps to get the exact location of an error 
 
