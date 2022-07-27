@@ -2,6 +2,9 @@
 
 #include "sqlite3.h"
 
+#include <cassert>
+#include <experimental/filesystem>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -17,11 +20,18 @@ SQLite_DB::SQLite_DB(const std::string& n)
   , m_table_name("Contacts")
 {}
 
+SQLite_DB::~SQLite_DB()
+{
+	disconnect();
+}
+
 bool SQLite_DB::create_database()
 {
   if (sqlite3_open(m_name.c_str(), &m_db_ptr) != SQLITE_OK) {
+  //if (sqlite3_open_v2(m_name.c_str(), &m_db_ptr, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) {
     report_sqlite_error(__FILE__, __LINE__);
-    return false;
+	disconnect();
+	return false;
   }
   return true;
 }
@@ -32,17 +42,16 @@ bool SQLite_DB::generate_data(int row_count)
             << "\t\tPlease wait for a while...\n";
 
   if (!create_table()) {
-    std::cerr << "ERROR: Failed to create a table...\n";
-    sqlite3_close(m_db_ptr);
+	disconnect(); //sqlite3_close(m_db_ptr);
     return false;
   } 
 
   if (!fillup_table(row_count)) {
-    return false;
+	  disconnect();
+	  return false;
   }
   std::cerr << "\n- Finished adding data...\n\n";
 
-  sqlite3_close(m_db_ptr);
   return true;
 }
 
@@ -55,9 +64,11 @@ bool SQLite_DB::create_table() const
             "COUNTRY TEXT  NOT NULL,"
             "EMAIL   TEXT  NOT NULL UNIQUE);";
 
+  assert(m_db_ptr != nullptr);    // must be a valid and open database connection.
   int rc = sqlite3_exec(m_db_ptr, sqlstatement.c_str(), 0, 0, 0);
   if (rc != SQLITE_OK) {
-    report_sqlite_error(__FILE__, __LINE__);
+	std::cerr << "result code of CREATE TABLE IF NOT EXISTS is: " << rc << std::endl;
+	report_sqlite_error(__FILE__, __LINE__);
     return false;
   }
   return true;
@@ -65,12 +76,6 @@ bool SQLite_DB::create_table() const
 
 bool SQLite_DB::fillup_table(int row_count)
 {
-  int rc = sqlite3_open(m_name.c_str(), &m_db_ptr);
-  if (rc != SQLITE_OK) {
-    std::cerr << "ERROR: Failed to open the database\n";
-    report_sqlite_error(__FILE__, __LINE__);
-    return false;
-  }
   std::cout << "- Filling up...";
 
   for (int i = 0; i < row_count; ++i) {
@@ -81,11 +86,6 @@ bool SQLite_DB::fillup_table(int row_count)
     std::cout << ".";
   }
 
-  rc = sqlite3_close(m_db_ptr);
-  if (rc != SQLITE_OK) {
-    report_sqlite_error(__FILE__, __LINE__);
-    return false;
-  }
   return true;
 }
 
@@ -94,19 +94,25 @@ bool SQLite_DB::dump_to_file(const std::string& file_path)
   std::ofstream fout(file_path);
   if (!fout.is_open()) {
     std::cerr << "Error: Failed open the file..."  << std::endl;
+	disconnect();
     return false;
   }
 
-  if (sqlite3_open(m_name.c_str(), &m_db_ptr) != SQLITE_OK) {
-    report_sqlite_error(__FILE__, __LINE__);
-    return false;
+  std::experimental::filesystem::path p1(file_path);
+  if (p1.compare(m_name) == 0) {                      // TODO: Enhance to compare absolute paths
+	  std::cerr << "Error: Dump file name should differ from database file name." << std::endl;
+	  disconnect();
+	  return false;
   }
+  
+  assert(m_db_ptr != nullptr);
 
   sqlite3_stmt *select_stmt = nullptr;
   const std::string sql_statement = "SELECT * FROM Contacts;";
   int rc = sqlite3_prepare_v2(m_db_ptr, sql_statement.c_str(), -1, &select_stmt, 0);
   if (rc != SQLITE_OK) {
     report_sqlite_error(__FILE__, __LINE__);
+	disconnect();
     return false;
   }
   /* dump columns names into the file */
@@ -118,13 +124,12 @@ bool SQLite_DB::dump_to_file(const std::string& file_path)
   fout << std::endl;
 
   /* Dump columns data into the file */
-  while (SQLITE_ROW == sqlite3_step(select_stmt)) {
+  while (sqlite3_step(select_stmt) == SQLITE_ROW) {
     for (int i = 0; i < N; i++) {
       const int w = (i == 0) ? 8 : 24;
       fout << std::setw(w) << sqlite3_column_text(select_stmt, i);
     }
     fout << std::endl;
-    //sqlite3_reset(select_stmt);
   }
 
   sqlite3_finalize(select_stmt);
@@ -149,29 +154,20 @@ SQLite_DB::Record SQLite_DB::generate_record() const
 
 bool SQLite_DB::add_record(const Record& rec) const
 {
-  sqlite3_stmt* insert_stmt = nullptr;
-  std::string id = std::to_string(++s_record_id);
-  const std::string sql_statement = "INSERT INTO " + m_table_name +
-    " VALUES (" + id + ", \"" + rec.name + "\", \"" + rec.country + "\", \"" + rec.email + "\");";
+	sqlite3_stmt* insert_stmt = nullptr;
+	std::string id = std::to_string(++s_record_id);
+	const std::string sql_statement = "INSERT INTO " + m_table_name +
+		" VALUES (" + id + ", \"" + rec.name + "\", \"" + rec.country + "\", \"" + rec.email + "\");";
 
-  int rc = sqlite3_prepare_v2(m_db_ptr, sql_statement.c_str(), sql_statement.size(), &insert_stmt, 0); // preparing the statement
-  if (rc != SQLITE_OK) {
-    report_sqlite_error(__FILE__, __LINE__);
-    sqlite3_finalize(insert_stmt);
-    return false;
-  }
+	char* err = nullptr;
+	int rc = sqlite3_exec(m_db_ptr, sql_statement.c_str(), 0, 0, &err);
+	if (rc != SQLITE_OK) {
+		report_sqlite_error(__FILE__, __LINE__);
+		sqlite3_free(err);
+		return false;
+	}
 
-  rc = sqlite3_step(insert_stmt); // executing the statement
-  if (!(rc == SQLITE_DONE || rc == SQLITE_OK)) {
-    report_sqlite_error(__FILE__, __LINE__);
-    sqlite3_finalize(insert_stmt);
-    return false;
-  }
-
-  sqlite3_reset(insert_stmt);
-  sqlite3_finalize(insert_stmt);
-
-  return true;
+	return true;
 }
 
 void SQLite_DB::disconnect() const
@@ -183,4 +179,14 @@ void SQLite_DB::report_sqlite_error(const std::string& file, int line) const
 {
   std::cerr << "Error " << sqlite3_errcode(m_db_ptr) << ": " << sqlite3_errmsg(m_db_ptr)
             << " at " << file << ":" << line << std::endl;
+}
+
+void SQLite_DB::drop_table() const
+{
+	const std::string sql_stmt = "DROP TABLE IF EXISTS " + m_table_name + ";";
+
+	int rc = sqlite3_exec(m_db_ptr, sql_stmt.c_str(), 0, 0, 0);
+	if (rc != SQLITE_OK) {
+		report_sqlite_error(__FILE__, __LINE__);
+	}
 }

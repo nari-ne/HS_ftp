@@ -13,3 +13,5 @@ std::string generate_random_string(int length, bool include_digits = true);
 std::string generate_unique_email();
 
 bool file_exists(const std::string& file_name);
+
+//int path_compare(const std::filesystem::path& p1, const std::filesystem::path& p2);
