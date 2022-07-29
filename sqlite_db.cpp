@@ -96,8 +96,11 @@ bool SQLite_DB::dump_to_file(const std::string& file_path)
     return false;
   }
 
-  std::experimental::filesystem::path p1(file_path);
-  if (p1.compare(m_name) == 0) {                      // TODO: Enhance to compare absolute paths
+  std::experimental::filesystem::path p(file_path);
+  if (!p.is_absolute()) {
+	  p = std::experimental::filesystem::absolute(p);
+  }
+  if (p.compare(std::experimental::filesystem::absolute(m_name)) == 0) {
 	  std::cerr << "Error: Dump file name should differ from database file name." << std::endl;
 	  disconnect();
 	  return false;
